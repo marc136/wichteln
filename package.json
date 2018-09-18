@@ -1,0 +1,27 @@
+{
+  "name": "wichteln",
+  "version": "1.0.0",
+  "description": "Wichtel App",
+  "main": "nodejs/server.js",
+  "scripts": {
+    "test": "elm-test elm/",
+    "format": "elm-format --yes elm/src/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marc136/wichteln.git"
+  },
+  "private": true,
+  "author": "Marc Walter",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/marc136/wichteln/issues"
+  },
+  "homepage": "https://github.com/marc136/wichteln#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "elm": "^0.19.0-bugfix2",
+    "elm-format": "^0.8.0",
+    "elm-test": "^0.18.13-beta"
+  }
+}
