@@ -1,0 +1,14 @@
+# Distribution
+build/
+
+# hidden files
+hidden-*
+res-*
+
+# dependencies
+elm-stuff
+node_modules
+
+# trash files
+.DS_Store
+.Thumbs.db
