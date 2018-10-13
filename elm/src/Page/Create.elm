@@ -1,76 +1,49 @@
-module Page.Create exposing (Model, Msg, init, update, view)
+module Page.Create exposing (Msg, allEmailsFilledIfNeeded, init, noGdprConfirmation, tooFewParticipants, update, view)
 
+import Browser.Dom as Dom
+import Date exposing (Date)
+import Dev
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
+import Json.Encode as E
+import Page.Create.Constants as Constants
+import Page.Create.Encoder as Encoder
+import Page.Create.Model as Model exposing (Filter(..), Kind(..), Model, Participant, SettingsError(..))
+import Page.Create.Sanitize as Sanitize
+import Page.Create.Stage as Stage exposing (Stage)
+import Task
 
 
 
 ---- MODEL ----
 
 
-type alias Model =
-    { stage : Stage
-    , kind : Kind
-    , filterFields : Filter
-    , participants : List Participant
-    }
-
-
-type Stage
-    = ChooseKind (Maybe Kind)
-    | ChooseFilter (Maybe Filter)
-    | EnterParticipants
-
-
-type Kind
-    = FixedList
-    | InviteParticipants
-
-
-type Filter
-    = OnlyNames
-    | NamesAndEmail
-    | All
-
-
-type alias Participant =
-    { name : String
-    , email : String
-    }
-
-
-newParticipant : Participant
-newParticipant =
-    { name = ""
-    , email = ""
-    }
-
-
-emptyParticipant : Filter -> Participant -> Bool
-emptyParticipant filter { name, email } =
-    case filter of
-        OnlyNames ->
-            String.isEmpty name
-
-        NamesAndEmail ->
-            String.isEmpty name && String.isEmpty email
-
-        All ->
-            String.isEmpty name && String.isEmpty email
-
-
 init : ( Model, Cmd Msg )
 init =
-    ( default, Cmd.none )
+    ( Model.default, Task.perform Today Date.today )
 
 
-default : Model
-default =
-    { stage = ChooseKind Nothing
+
+-- |> Tuple.mapFirst (\_ -> test1)
+
+
+test1 : Model
+test1 =
+    { today = Date.fromOrdinalDate 2018 123
+    , stage = Stage.LastCheck
+    , highestStage = Stage.LastCheck
     , kind = FixedList
-    , filterFields = NamesAndEmail
-    , participants = [ newParticipant ]
+    , filterFields = NameAndEmail
+    , participants =
+        [ { name = "1", email = "b" }
+        , { name = "2", email = "" }
+        , { name = "3", email = "" }
+        , { name = "4", email = "d" }
+        ]
+    , mayStoreEmail = False
+    , deleteAfter = 31
+    , settingsErrors = []
     }
 
 
@@ -80,12 +53,15 @@ default =
 
 type Msg
     = NoOp
+    | Today Date
     | Pick Kind
     | PickFilter Filter
     | AddParticipant
     | ChangeParticipantName Int String
     | ChangeParticipantEmail Int String
-    | CheckParticipants
+    | GoTo Stage
+    | ToggleMayStoreEmails
+    | DeleteAfter (Maybe Int)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -94,27 +70,29 @@ update msg model =
         NoOp ->
             ( model, Cmd.none )
 
-        Pick kind ->
-            ( { model
-                | kind = kind
-                , stage =
-                    if model.stage /= EnterParticipants then
-                        ChooseFilter Nothing
+        Today today ->
+            ( { model | today = today }, Cmd.none )
 
-                    else
-                        model.stage
-              }
+        GoTo stage ->
+            ( goto stage model, Cmd.none )
+
+        Pick kind ->
+            ( { model | kind = kind }
+                |> goto Stage.ChooseFilter
             , Cmd.none
             )
 
         PickFilter filter ->
-            ( { model | filterFields = filter, stage = EnterParticipants }
-            , Cmd.none
+            ( { model | filterFields = filter }
+                |> goto Stage.EnterParticipants
+            , focus <| participantId (List.length model.participants - 1)
             )
 
         AddParticipant ->
-            ( { model | participants = model.participants ++ [ newParticipant ] }
-            , Cmd.none
+            ( { model
+                | participants = model.participants ++ [ Model.newParticipant ]
+              }
+            , focus <| participantId (List.length model.participants)
             )
 
         ChangeParticipantName index string ->
@@ -128,14 +106,51 @@ update msg model =
             ( { model
                 | participants =
                     set index (\p -> { p | email = string }) model.participants
+                , mayStoreEmail = False
               }
             , Cmd.none
             )
 
-        CheckParticipants ->
-            -- TODO
-            -- ( { model  })
+        ToggleMayStoreEmails ->
+            ( { model | mayStoreEmail = not model.mayStoreEmail }, Cmd.none )
+
+        DeleteAfter Nothing ->
             ( model, Cmd.none )
+
+        DeleteAfter (Just days) ->
+            ( { model | deleteAfter = days }, Cmd.none )
+
+
+goto : Stage -> Model -> Model
+goto stage model =
+    { model | stage = stage }
+        |> increaseHighestStageIfNeeded stage
+        |> trimParticipantsIfNeeded stage
+        |> checkForSettingsErrors
+
+
+trimParticipantsIfNeeded : Stage -> Model -> Model
+trimParticipantsIfNeeded stage model =
+    if stage == Stage.LastCheck then
+        { model | participants = Sanitize.dropEmptyParticipants model }
+
+    else
+        model
+
+
+increaseHighestStageIfNeeded : Stage -> Model -> Model
+increaseHighestStageIfNeeded stage model =
+    case Stage.compare stage model.highestStage of
+        GT ->
+            { model | highestStage = stage }
+
+        _ ->
+            model
+
+
+focus : String -> Cmd Msg
+focus id =
+    Task.attempt (\_ -> NoOp) (Dom.focus id)
 
 
 set : Int -> (a -> a) -> List a -> List a
@@ -150,50 +165,175 @@ set index fn =
         )
 
 
+checkForSettingsErrors : Model -> Model
+checkForSettingsErrors model =
+    { model | settingsErrors = checkSettingsErrors model }
 
--- checkParticipants : Model ->
--- checkParticipants { filterFields, participants } =
+
+checkSettingsErrors : Model -> List SettingsError
+checkSettingsErrors model =
+    [ tooFewParticipants model
+    , allEmailsFilledIfNeeded model
+    , noGdprConfirmation model
+    ]
+        |> List.filterMap identity
+
+
+tooFewParticipants : Model -> Maybe SettingsError
+tooFewParticipants model =
+    if
+        Sanitize.dropEmptyParticipants model
+            |> List.length
+            |> (>) Constants.minimumParticipants
+    then
+        Just TooFewParticipants
+
+    else
+        Nothing
+
+
+allEmailsFilledIfNeeded : Model -> Maybe SettingsError
+allEmailsFilledIfNeeded model =
+    if model.filterFields /= NameAndEmail then
+        Nothing
+
+    else if
+        Sanitize.dropEmptyParticipants model
+            |> List.any (\p -> String.isEmpty p.email)
+    then
+        Just EmailsMissing
+
+    else
+        Nothing
+
+
+noGdprConfirmation : Model -> Maybe SettingsError
+noGdprConfirmation model =
+    if model.filterFields == OnlyNames || model.mayStoreEmail then
+        Nothing
+
+    else
+        Just MayNotStoreEmail
+
+
+
 ---- VIEW ----
 
 
 view : Model -> Html Msg
 view model =
-    case model.stage of
-        ChooseKind maybeKind ->
-            chooseKind maybeKind
-
-        ChooseFilter maybeFilter ->
-            chooseFilter maybeFilter
-
-        EnterParticipants ->
-            -- div []
-            --     [ h1 [] [ text "Your Elm App is working!" ]
-            --     , a [ href "/neu" ] [ text "/neu" ]
-            --     ]
-            enterParticipants model.participants model.filterFields
-
-
-chooseKind : Maybe Kind -> Html Msg
-chooseKind maybeKind =
     div []
-        [ h1 [] [ text "Schritt eins: Liste" ]
-        , div []
-            [ div [ class "half", onClick (Pick FixedList) ]
-                [ p [] [ text "Ich habe eine fertige Liste aller Teilnehmer" ] ]
-            , div [ class "half", onClick (Pick InviteParticipants) ]
-                [ p [] [ text "Jeder Teilnehmer soll zuerst noch bestätigen, ob er teilnehmen möchte." ]
+        [ header model
+        , case model.stage of
+            Stage.ChooseKind ->
+                chooseKind model
+
+            Stage.ChooseFilter ->
+                chooseFilter model
+
+            Stage.EnterParticipants ->
+                enterParticipants model.participants model.filterFields
+
+            Stage.ConfirmDataProtection ->
+                confirm model
+
+            Stage.LastCheck ->
+                if model.settingsErrors == [] then
+                    lastCheck model
+
+                else
+                    checkFailed model
+        ]
+
+
+header : Model -> Html Msg
+header model =
+    let
+        event stage =
+            if Stage.toInt model.highestStage - Stage.toInt stage >= -1 then
+                GoTo stage
+
+            else
+                NoOp
+
+        btn stage =
+            li
+                [ onClick <| event stage
+                , classList
+                    [ ( "not-visited", Stage.compare model.highestStage stage == LT )
+                    , ( "current", model.stage == stage )
+                    ]
                 ]
+                [ a [ href "#" ] [ text <| Stage.toString stage ] ]
+    in
+    div [ class "progress-dots" ]
+        [ ul [ class "stages" ]
+            [ btn Stage.ChooseKind
+            , btn Stage.ChooseFilter
+            , btn Stage.EnterParticipants
+            , btn Stage.ConfirmDataProtection
+            , btn Stage.LastCheck
             ]
         ]
 
 
-chooseFilter : Maybe Filter -> Html Msg
-chooseFilter maybeFilter =
+chooseKind : Model -> Html Msg
+chooseKind model =
+    let
+        maybeKind =
+            if model.highestStage /= Stage.ChooseKind then
+                Just model.kind
+
+            else
+                Nothing
+
+        revisit =
+            model.highestStage /= Stage.ChooseKind
+    in
+    div []
+        [ h1 [] [ text "Schritt eins: Liste" ]
+        , div []
+            [ div
+                [ class "half"
+                , classList [ ( "selected", revisit && (model.kind == FixedList) ) ]
+                , onClick (Pick FixedList)
+                ]
+                [ p [] [ text "Ich habe eine fertige Liste aller Teilnehmer" ] ]
+            , div
+                [ class "half"
+                , classList [ ( "selected", revisit && (model.kind == InviteParticipants) ) ]
+                , onClick (Pick InviteParticipants)
+                ]
+                [ p [] [ text "Jeder Teilnehmer soll zuerst noch bestätigen, ob er teilnehmen möchte." ]
+                ]
+            ]
+        , if revisit then
+            div [ class "gotoButtons" ]
+                [ button
+                    [ class "forward", onClick <| GoTo Stage.ChooseFilter ]
+                    [ text "weiter" ]
+                ]
+
+          else
+            text ""
+        ]
+
+
+chooseFilter : Model -> Html Msg
+chooseFilter model =
     div []
         [ h1 [] [ text "Schritt zwei: Benachrichtigungen" ]
-        , fieldFilter (Maybe.withDefault All maybeFilter) OnlyNames
-        , fieldFilter (Maybe.withDefault OnlyNames maybeFilter) All
-        , fieldFilter (Maybe.withDefault All maybeFilter) NamesAndEmail
+        , fieldFilter model.filterFields OnlyNames
+        , fieldFilter model.filterFields NameOrEmail
+        , fieldFilter model.filterFields NameAndEmail
+        , div [ class "gotoButtons" ]
+            [ button
+                [ class "back", onClick <| GoTo Stage.ChooseKind ]
+                [ text "zurück" ]
+            , button
+                [ class "forward", onClick <| GoTo Stage.EnterParticipants ]
+                [ text "weiter" ]
+            ]
         ]
 
 
@@ -225,14 +365,14 @@ filterToString filter =
             , "Ich werde alle Teilnehmer selbst benachrichtigen"
             )
 
-        NamesAndEmail ->
-            ( "names-and-email"
-            , "Willi soll alle Teilnehmer benachrichtigen"
+        NameOrEmail ->
+            ( "name-or-email"
+            , "Willi und ich teilen uns die Arbeit"
             )
 
-        All ->
-            ( "all"
-            , "Willi und ich teilen uns die Arbeit"
+        NameAndEmail ->
+            ( "name-and-email"
+            , "Willi soll alle Teilnehmer benachrichtigen"
             )
 
 
@@ -240,10 +380,18 @@ enterParticipants : List Participant -> Filter -> Html Msg
 enterParticipants participants filter =
     div []
         [ h1 [] [ text "Teilnehmer eingeben:" ]
-        , ul [] (List.indexedMap (enterParticipant filter) participants)
+        , ul [ class "participants enter" ]
+            (List.indexedMap (enterParticipant filter) participants)
         , button [ onClick AddParticipant ] [ text "Teilnehmer hinzufügen" ]
         , hr [] []
-        , button [ onClick CheckParticipants ] [ text "weiter" ]
+        , div [ class "gotoButtons" ]
+            [ button
+                [ class "back", onClick <| GoTo Stage.ChooseFilter ]
+                [ text "zurück" ]
+            , button
+                [ class "forward", onClick <| GoTo Stage.ConfirmDataProtection ]
+                [ text "weiter" ]
+            ]
         ]
 
 
@@ -254,6 +402,7 @@ enterParticipant filter index participant =
             [ input
                 [ value participant.name
                 , onInput (ChangeParticipantName index)
+                , id <| participantId index
                 ]
                 []
             ]
@@ -264,9 +413,9 @@ enterParticipant filter index participant =
                 participantId index
         in
         li []
-            [ label [ for (id_ ++ "_name") ] [ text "Name" ]
+            [ label [ for id_ ] [ text "Name" ]
             , input
-                [ id (id_ ++ "_name")
+                [ id id_
                 , value participant.name
                 , onInput (ChangeParticipantName index)
                 ]
@@ -284,3 +433,217 @@ enterParticipant filter index participant =
 participantId : Int -> String
 participantId index =
     "participant" ++ String.fromInt index
+
+
+confirm : Model -> Html Msg
+confirm model =
+    div []
+        [ h1 [] [ text "confirm TODO" ]
+        , if model.filterFields /= OnlyNames then
+            let
+                id_ =
+                    "confirm-gdpr"
+            in
+            div [ class "row" ]
+                [ input
+                    [ id id_
+                    , type_ "checkbox"
+                    , value "gdpr"
+                    , onClick ToggleMayStoreEmails
+                    , checked model.mayStoreEmail
+                    ]
+                    []
+                , label [ for id_ ]
+                    [ text "Ich habe die Einwilligung von allen Teilnehmern, ihre Email Adressen bei Willi zu speichern." ]
+                ]
+
+          else
+            text ""
+        , label [ for "delete-after" ] [ text "Daten löschen nach" ]
+        , select [ id "delete-after", onInput (DeleteAfter << String.toInt) ]
+            [ option [ value "14", selected (model.deleteAfter == 14) ]
+                [ text "Zwei Wochen" ]
+            , option [ value "31", selected (model.deleteAfter == 31) ]
+                [ text "Einem Monat" ]
+            , option [ value "93", selected (model.deleteAfter == 93) ]
+                [ text "Drei Monaten" ]
+            , option [ value "186", selected (model.deleteAfter == 186) ]
+                [ text "Sechs Monaten" ]
+            , option [ value "279", selected (model.deleteAfter == 279) ]
+                [ text "Neun Monaten" ]
+            ]
+        , div [ class "gotoButtons" ]
+            [ button
+                [ class "back", onClick <| GoTo Stage.EnterParticipants ]
+                [ text "zurück" ]
+            , button
+                [ class "forward", onClick <| GoTo Stage.LastCheck ]
+                [ text "weiter" ]
+            ]
+        ]
+
+
+checkFailed : Model -> Html Msg
+checkFailed model =
+    div []
+        [ h1 [] [ text "checkFailed" ]
+        , summary model
+        , debug model
+        ]
+
+
+lastCheck : Model -> Html Msg
+lastCheck model =
+    div []
+        [ h1 [] [ text "lastCheck" ]
+        , summary model
+        , debug model
+        ]
+
+
+summary : Model -> Html Msg
+summary model =
+    div []
+        [ p [] [ text (summaryStart model) ]
+        , if Sanitize.hasError TooFewParticipants model then
+            problem Stage.EnterParticipants "Es müssen mindestens vier Teilnehmer eingetragen werden, damit nicht sofort klar ist, wer wen beschenkt."
+
+          else
+            text ""
+        , if List.length model.participants < Constants.minimumParticipants then
+            text ""
+
+          else
+            div [] (summaryContact model)
+        , div [] (summaryDataProtection model)
+        , div [] []
+        ]
+
+
+problem : Stage -> String -> Html Msg
+problem stage msg =
+    div [ class "error" ]
+        [ text ("Fehler: " ++ msg)
+        , button
+            [ onClick <| GoTo stage ]
+            [ text "Fehler beheben" ]
+        ]
+
+
+summaryStart : Model -> String
+summaryStart model =
+    let
+        startDate =
+            Sanitize.startOn model
+    in
+    case model.kind of
+        FixedList ->
+            let
+                startOn =
+                    case Date.diff Date.Days model.today startDate of
+                        0 ->
+                            "sofort"
+
+                        1 ->
+                            "morgen"
+
+                        _ ->
+                            "am " ++ formatDate startDate
+            in
+            "Die Wichtel werden " ++ startOn ++ " ausgelost."
+
+        InviteParticipants ->
+            let
+                startOn =
+                    case Date.diff Date.Days model.today startDate of
+                        0 ->
+                            "Heute"
+
+                        1 ->
+                            "Bis Morgen"
+
+                        _ ->
+                            "Bis " ++ formatDate startDate
+            in
+            startOn ++ " können die Wichtel zusagen, danach beginnt das Auslosen."
+
+
+formatDate : Date -> String
+formatDate =
+    Date.format "dd.MM.y"
+
+
+summaryContact : Model -> List (Html Msg)
+summaryContact model =
+    let
+        participants : List Participant
+        participants =
+            Sanitize.dropEmptyParticipants model
+
+        count list =
+            String.fromInt (List.length list)
+    in
+    case model.filterFields of
+        OnlyNames ->
+            [ text <| count participants ++ " Wichtel dürfen teilnehmen." ]
+
+        NameOrEmail ->
+            let
+                ( manual, automated ) =
+                    List.partition (String.isEmpty << .email) participants
+
+                row string =
+                    p [ class "row" ] [ text string ]
+            in
+            [ row <| count manual ++ " Wichtel werden von dir benachrichtigt."
+            , ul [] <|
+                List.map (\{ name } -> li [] [ text name ]) manual
+            , row <| count automated ++ " Wichtel werden von Willi benachrichtigt."
+            , ul [] <|
+                List.map (\{ email } -> li [] [ text email ]) automated
+            ]
+
+        NameAndEmail ->
+            [ "Alle "
+                ++ count participants
+                ++ " Wichtel werden von Willi benachrichtigt."
+                |> text
+            , if Sanitize.hasError EmailsMissing model then
+                problem Stage.EnterParticipants "Willi braucht von jedem Teilnehmer eine Email Adresse."
+
+              else
+                List.map (\{ email } -> li [] [ text email ]) participants
+                    |> ul []
+            ]
+
+
+summaryDataProtection : Model -> List (Html Msg)
+summaryDataProtection model =
+    [ if Sanitize.hasError MayNotStoreEmail model then
+        problem Stage.ConfirmDataProtection "Willi hat nicht das Recht, die Teilnehmer zu speichern."
+
+      else
+        p []
+            [ "Willi wird alle Daten nach dem "
+                ++ formatDate (Sanitize.deleteAfter model)
+                ++ " löschen."
+                |> text
+            ]
+    ]
+
+
+debug model =
+    let
+        err e =
+            li [] [ text <| Debug.toString e ]
+    in
+    div []
+        [ h1 []
+            [ text "errors: "
+            , text <| String.fromInt <| List.length model.settingsErrors
+            ]
+        , ol [] <|
+            List.map err model.settingsErrors
+        , button [ onClick (GoTo Stage.LastCheck) ] [ text "again" ]
+        , pre [] [ code [] [ text <| Dev.jsonToString <| Encoder.encode model ] ]
+        ]

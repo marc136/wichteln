@@ -6,6 +6,7 @@ import Html exposing (Html, div, h1, img, text)
 import Html.Attributes exposing (src)
 import Json.Encode exposing (Value)
 import Page.Create
+import Page.Create.Model
 import Page.Home
 import Url exposing (Url)
 import Url.Parser as UrlParser
@@ -23,7 +24,7 @@ type alias Model =
 
 type Page
     = Home Page.Home.Model
-    | Create Page.Create.Model
+    | Create Page.Create.Model.Model
 
 
 type Route

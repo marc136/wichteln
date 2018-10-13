@@ -1,15 +1,170 @@
+:root {
+    --selection: hsl(60, 71%, 35%);
+    --primary-darker: hsl(60, 71%, 15%);
+}
+
 body {
-  font-family: 'Source Sans Pro', 'Trebuchet MS', 'Lucida Grande', 'Bitstream Vera Sans', 'Helvetica Neue', sans-serif;
-  margin: 0;
-  text-align: center;
-  color: #293c4b;
+    font-family: 'Source Sans Pro', 'Trebuchet MS', 'Lucida Grande', 'Bitstream Vera Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    color: #293c4b;
 }
 
 h1 {
-  font-size: 30px;
+    font-size: 30px;
 }
 
 img {
-  margin: 20px 0;
-  max-width: 200px;
+    margin: 20px 0;
+    max-width: 200px;
+}
+
+.selected {
+    border: .1em solid var(--selection);
+    border-radius: .1em;
+    background-color: var(--selection);
+    color: white;
+}
+
+ul.participants.enter {
+    list-style-type: none;
+    padding: 0;
+}
+
+ul.participants.enter>li {
+    margin: .8em 0;
+    display: flex;
+    flex-direction: column;
+}
+
+
+/* dot progress navigation */
+
+.progress-dots {
+    margin-top: 50px;
+    display: flex;
+    justify-content: center;
+    --dot-border: 2px;
+    --dot-diameter: 20px;
+    --dot-anim: 0.3s;
+}
+
+.progress-dots>ul {
+    position: relative;
+    display: inline-block;
+    margin: 0 auto;
+    padding: 0;
+    list-style: none;
+    cursor: default;
+    user-select: none;
+    background-color: var(--selection);
+    border-radius: var(--dot-diameter);
+    border: var(--dot-border) solid var(--selection);
+    display: inline-flex;
+    display: flex;
+    /* min-width: calc(20 * var(--dot-diameter)); */
+    width: 70%;
+    justify-content: space-between;
+}
+
+.progress-dots li {
+    position: relative;
+    display: block;
+    z-index: 1;
+    width: var(--dot-diameter);
+    height: var(--dot-diameter);
+    cursor: pointer;
+    border: var(--dot-border) solid white;
+    border-radius: 50%;
+    transition: border-color var(--dot-anim) ease;
+}
+
+.progress-dots li.not-visited {
+    border-style: dashed;
+    cursor: default;
+}
+
+.no-flexbox .progress-dots li {
+    float: left;
+    margin: 0 var(--dot-diameter);
+}
+
+.no-flexbox .progress-dots li:first-child {
+    margin-left: 0;
+}
+
+.no-flexbox .progress-dots li:last-child {
+    margin-right: 0;
+}
+
+.progress-dots li>a {
+    position: absolute;
+    top: auto;
+    bottom: 28px;
+    left: 50%;
+    /* width: 100%; */
+    /* height: 100%; */
+    width: auto;
+    height: auto;
+    padding: 0 10px;
+    border: var(--dot-border) solid white;
+    border-radius: var(--dot-border);
+    border-radius: var(--dot-diameter);
+    border-radius: 2em;
+    background-color: var(--selection);
+    color: white;
+    text-decoration: none;
+    /* text-indent: 0; */
+    line-height: 2em;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-50%) translateY(-50%);
+    transition: transform var(--dot-anim) ease, opacity var(--dot-anim) ease, visibility 0s var(--dot-anim) ease;
+}
+
+.progress-dots a,
+.progress-dots a:focus {
+    outline: none;
+}
+
+.progress-dots li:hover>a,
+.progress-dots li.current>a {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0%);
+    transition: transform var(--dot-anim) ease, opacity var(--dot-anim) ease;
+}
+
+.progress-dots li.current {
+    border-color: var(--selection);
+    background: white;
+}
+
+.progress-dots li:hover,
+.progress-dots li:hover>a,
+.progress-dots li.current>a {
+    z-index: 11;
+}
+
+.progress-dots ul:hover>li.current>a {
+    opacity: 0.4;
+}
+
+.progress-dots ul>li.current:hover>a {
+    opacity: 1;
+}
+
+.progress-dots li>a::after {
+    position: absolute;
+    left: 50%;
+    margin-left: -6px;
+    width: 0;
+    height: 0;
+    border: 6px solid transparent;
+    border-top-color: var(--selection);
+    content: '';
+    pointer-events: none;
+    top: 99%;
+    backface-visibility: hidden;
+    transition: opacity var(--dot-anim) ease;
 }
