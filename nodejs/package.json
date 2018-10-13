@@ -4,16 +4,27 @@
   "description": "Wichteln Server",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tap tests/**.js",
+    "cover": "npm test -- --cov"
   },
   "private": true,
   "keywords": [],
   "author": "Marc Walter",
   "license": "BSD-3-Clause",
   "dependencies": {
+    "djv": "^2.1.1",
+    "koa": "^2.5.3",
+    "koa-bodyparser": "^4.2.1",
+    "koa-logger": "^3.2.0",
+    "koa-rewrite": "^3.0.1",
+    "koa-route": "^3.2.0",
+    "koa-static": "^5.0.0"
   },
   "devDependencies": {
+    "deep-copy": "^1.4.2",
     "folder-hash": "^2.1.1",
-    "npx": "^10.2.0"
+    "npx": "^10.2.0",
+    "supertest": "^3.3.0",
+    "tap": "^12.0.1"
   }
 }
