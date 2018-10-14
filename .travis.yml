@@ -1,0 +1,19 @@
+language: node_js
+node_js:
+  - "10.9.0"
+unused_node_js:
+  - "node"
+  - "lts/*"
+cache:
+  directories:
+    - "node_modules"
+    - "nodejs/node_modules"
+install:
+  - npm install
+script:
+  - "cd nodejs && npm test && cd .."
+  - "cd elm && npx elm-test"
+after_success:
+  - "cd nodejs"
+  - "npm install coveralls"
+  - "npm run cover -- --coverage-report=text-lcov | npx coveralls"

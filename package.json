@@ -4,8 +4,9 @@
   "description": "Wichtel App",
   "main": "nodejs/server.js",
   "scripts": {
-    "test": "elm-test elm/",
-    "format": "elm-format --yes elm/src/"
+    "test": "echo \"Execute the tests inside the subfolders\" && exit 1",
+    "format": "elm-format --elm-version=0.19 --yes elm/src/",
+    "postinstall": "cd nodejs && npm install"
   },
   "repository": {
     "type": "git",
@@ -20,8 +21,9 @@
   "homepage": "https://github.com/marc136/wichteln#readme",
   "dependencies": {},
   "devDependencies": {
-    "elm": "^0.19.0-bugfix2",
-    "elm-format": "^0.8.0",
-    "elm-test": "^0.18.13-beta"
+    "create-elm-app": "2.2.x",
+    "elm": "elm0.19.0",
+    "elm-format": "elm0.19.0",
+    "elm-test": "elm0.19.0"
   }
 }
