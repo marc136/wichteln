@@ -14,17 +14,14 @@ const rewrite = require('koa-rewrite')
 const createEvent = require('./server/create')
 const db = require('./server/db')
 
-
-/**
- * Server starts below
- */
-
+/* istanbul ignore next */
 const port = process.env.PORT || 8000
 
 console.log('Starting server')
 
 const app = new Koa()
 app.use(logger())
+/* istanbul ignore next */
 app.use(
   bodyParser({
     onerror: function _bodyParserOnError (err, ctx) {
@@ -34,14 +31,11 @@ app.use(
   })
 )
 
-// app.use(route.post('/auth/:provider/get-url', getUrl))
-// app.use(route.get('/auth/github/:key', getIndexWithKey))
-// app.use(route.get('/auth/google', getIndexWithKeyFromQueryParamsGoogle))
-// app.use(route.post('/auth/:provider/:key', getEmail))
 app.use(rewrite('/neu', '/'))
 app.use(serve('../elm/build'), { defer: true })
 app.use(route.post('/create', createEvent))
 
+/* istanbul ignore next */
 const server = app.listen(port).on('error', err => {
   console.error('ERROR: Will close program')
   console.error(err)

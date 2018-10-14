@@ -7,7 +7,7 @@ function print (obj) {
 }
 
 function randomString (len) {
-  if (!Number.isInteger(len)) len = 8
+  if (!Number.isInteger(len) || len < 1) len = 8
 
   return crypto.randomBytes(Math.ceil(len / 2)).toString('hex').slice(0, len)
 }
