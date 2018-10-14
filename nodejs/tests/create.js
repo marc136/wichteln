@@ -88,7 +88,10 @@ async function wrongParamValues (t) {
     {
       body: {
         ...clone(successBody),
-        participants: successParticipants.splice(0, 1)
+        participants: [
+          ...successParticipants.splice(0, 1),
+          { name: '', email: '' }
+        ]
       },
       error: 'TooFewParticipants' // 4 participants, but one is empty
     }
