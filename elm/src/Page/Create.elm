@@ -6,6 +6,8 @@ import Dev
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
+import Http
+import Json.Decode as D exposing (Value)
 import Json.Encode as E
 import Page.Create.Constants as Constants
 import Page.Create.Encoder as Encoder
@@ -44,6 +46,7 @@ test1 =
     , mayStoreEmail = False
     , deleteAfter = 31
     , settingsErrors = []
+    , lastResponse = Ok "leer"
     }
 
 
@@ -62,6 +65,8 @@ type Msg
     | GoTo Stage
     | ToggleMayStoreEmails
     | DeleteAfter (Maybe Int)
+    | Submit
+    | SubmitResponse (Result Http.Error Value)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -119,6 +124,26 @@ update msg model =
 
         DeleteAfter (Just days) ->
             ( { model | deleteAfter = days }, Cmd.none )
+
+        Submit ->
+            ( model
+            , Http.post "/create"
+                (Http.jsonBody (Encoder.encode model))
+                D.value
+                |> Http.send SubmitResponse
+            )
+
+        SubmitResponse (Err err) ->
+            let
+                _ =
+                    Debug.log "SubmitResponse Err" err
+            in
+            ( model, Cmd.none )
+
+        SubmitResponse result ->
+            result
+                |> Result.map Dev.jsonToString
+                |> (\r -> ( { model | lastResponse = r }, Cmd.none ))
 
 
 goto : Stage -> Model -> Model
@@ -222,27 +247,42 @@ noGdprConfirmation model =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ header model
-        , case model.stage of
-            Stage.ChooseKind ->
-                chooseKind model
+    div [ class "wichteln-create" ]
+        [ div [ class "wrapper" ]
+            [ header model
+            , case model.stage of
+                Stage.ChooseKind ->
+                    chooseKind model
 
-            Stage.ChooseFilter ->
-                chooseFilter model
+                Stage.ChooseFilter ->
+                    chooseFilter model
 
-            Stage.EnterParticipants ->
-                enterParticipants model.participants model.filterFields
+                Stage.EnterParticipants ->
+                    enterParticipants model.participants model.filterFields
 
-            Stage.ConfirmDataProtection ->
-                confirm model
+                Stage.ConfirmDataProtection ->
+                    confirm model
 
-            Stage.LastCheck ->
-                if model.settingsErrors == [] then
-                    lastCheck model
+                Stage.LastCheck ->
+                    if model.settingsErrors == [] then
+                        lastCheck model
 
-                else
-                    checkFailed model
+                    else
+                        checkFailed model
+            , button [ onClick Submit ] [ text "dev submit" ]
+            , case model.lastResponse of
+                Ok response ->
+                    div []
+                        [ h2 [] [ text "Last response: Ok" ]
+                        , pre [] [ code [] [ text response ] ]
+                        ]
+
+                Err response ->
+                    div []
+                        [ h2 [] [ text "Last response: Error " ]
+                        , pre [] [ code [] [ text (Debug.toString response) ] ]
+                        ]
+            ]
         ]
 
 
@@ -497,6 +537,12 @@ lastCheck model =
     div []
         [ h1 [] [ text "lastCheck" ]
         , summary model
+        , if List.length model.settingsErrors == 0 then
+            button [ onClick Submit ] [ text "Erstellen" ]
+
+          else
+            button [ disabled True ]
+                [ text "Kann nicht gespeichert werden, da Fehler existieren" ]
         , debug model
         ]
 

@@ -2,7 +2,7 @@ module Page.Create.Model exposing (Filter(..), Kind(..), Model, Participant, Set
 
 import Date exposing (Date)
 import Page.Create.Stage exposing (Stage(..))
-
+import Http
 
 type alias Model =
     { today : Date
@@ -14,6 +14,7 @@ type alias Model =
     , mayStoreEmail : Bool
     , deleteAfter : Int
     , settingsErrors : List SettingsError
+    , lastResponse : Result Http.Error String
     }
 
 
@@ -52,6 +53,7 @@ default =
     , mayStoreEmail = False
     , deleteAfter = 31
     , settingsErrors = []
+    , lastResponse = Ok "leer"
     }
 
 

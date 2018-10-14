@@ -40,12 +40,12 @@ encodeParticipants model =
 
 
 clearEmailsIfNeeded : Bool -> List Create.Participant -> List Create.Participant
-clearEmailsIfNeeded clear list =
-    if clear then
-        List.map (\p -> { p | email = "" }) list
+clearEmailsIfNeeded keepEmails list =
+    if keepEmails then
+        list
 
     else
-        list
+        List.map (\p -> { p | email = "" }) list
 
 
 participantToJson : { name : String, email : String } -> Value
