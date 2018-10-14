@@ -12,8 +12,7 @@ const successParticipants = [
   { name: 'wert', email: '' },
   { name: '', email: 'wx.yz@abc.de' },
   { name: '1', email: 'asdf@example.org' },
-  { name: 'wret', email: '' },
-  { name: '', email: '' }
+  { name: 'wret', email: '' }
 ]
 const successBody = {
   kind: 'fixedList',
@@ -24,17 +23,16 @@ const successBody = {
 }
 
 async function tests (t) {
-  const ctx = { request: { body: { hagge: 1 } } }
-  const body = { ...successBody, mayStoreEmails: false }
-
   await request
     .post('/create')
     .send(successBody)
-    // .set('Accept', 'application/json')
+    .set('Accept', 'application/json')
+    .expect('Content-Type', /json/)
     .expect(200)
     .then(response => {
-      // console.log('response body', response.body)
-      print(response.body)
+      // print(response.body)
+      t.ok(response.body.id, 'Should contain an id')
+      delete response.body.id
       t.deepEqual(response.body, successBody)
       // t.end())
     })

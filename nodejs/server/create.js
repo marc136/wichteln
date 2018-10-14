@@ -20,16 +20,26 @@ async function createEvent (ctx, next) {
 
   if (!data.mayStoreEmails) return badRequest('MayStoreEmailFalse')
 
-  const participants = data.participants.filter(participant => {
-    return participant.name.trim() !== '' || participant.email.trim() !== ''
-  })
+  const participants = data.participants
+    .map(participant => {
+      // drop other fields
+      return {
+        name: participant.name.trim(),
+        email: participant.email.trim()
+      }
+    })
+    .filter(participant => {
+      return participant.name !== '' || participant.email !== ''
+    })
 
   if (participants.length < 4) return badRequest('TooFewParticipants')
 
-  print({ participants })
-  // if (data.participants)
+  const id = db.generateId()
+  const result = { id, ...data, id, participants }
+  db.set(id, result)
+  print(db)
 
-  ctx.body = ctx.request.body
+  ctx.body = result
 }
 
 function sendError (ctx, code) {
