@@ -12,9 +12,8 @@ const rewrite = require('koa-rewrite')
 
 // local imports
 const createEvent = require('./server/create')
+const db = require('./server/db')
 
-// "database"
-const db = {}
 
 /**
  * Server starts below
