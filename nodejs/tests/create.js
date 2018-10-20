@@ -33,7 +33,26 @@ async function tests (t) {
       // print(response.body)
       t.ok(response.body.id, 'Should contain an id')
       delete response.body.id
-      t.deepEqual(response.body, successBody)
+
+      // order of participants is shuffled
+      response.body.participants.forEach(participant => {
+        for (let other of successParticipants) {
+          if (
+            participant.name === other.name &&
+            participant.email === other.email
+          ) {
+            return 'success'
+          }
+        }
+        // matching participant was not found
+        t.fail(`Could not find participant ${JSON.stringify(participant)}`)
+      })
+
+      // ensure other fields match
+      delete response.body.participants
+      const successCopy = clone(successBody)
+      delete successCopy.participants
+      t.deepEqual(response.body, successCopy)
       // t.end())
     })
 

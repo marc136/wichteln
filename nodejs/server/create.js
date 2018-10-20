@@ -25,21 +25,39 @@ async function createEvent (ctx, next) {
       // drop other fields
       return {
         name: participant.name.trim(),
-        email: participant.email.trim()
+        email: participant.email.trim(),
+        id: randomString(10)
       }
     })
     .filter(participant => {
       return participant.name !== '' || participant.email !== ''
     })
 
+  // Return error on duplicate names
+  // Allow duplicate email addresses
+
   if (participants.length < 4) return badRequest('TooFewParticipants')
 
   const id = db.generateId()
+  shuffleArrayInPlace(participants)
   const result = { id, ...data, id, participants }
   db.set(id, result)
+
   print(db)
 
+  // hide the sorting because it equals the chain of gifts
+  shuffleArrayInPlace(result.participants)
   ctx.body = result
+}
+
+function shuffleArrayInPlace (array) {
+  // Durstenfeld shuffle
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const temp = array[i]
+    array[i] = array[j]
+    array[j] = temp
+  }
 }
 
 function sendError (ctx, code) {

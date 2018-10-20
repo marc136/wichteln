@@ -1,4 +1,5 @@
 const { print, randomString } = require('./common')
+const clone = require('deep-copy')
 
 // "database"
 function DB () {}
@@ -23,7 +24,7 @@ DB.prototype.generateId = generateId
 // }
 
 DB.prototype.set = function set (id, content) {
-  db[id] = content
+  db[id] = clone(content)
   return id
 }
 
