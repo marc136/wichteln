@@ -34,7 +34,7 @@ async function tests (t) {
       t.ok(response.body.id, 'Should contain an id')
       delete response.body.id
 
-      // order of participants is shuffled
+      // order of participants is not guaranteed
       response.body.participants.forEach(participant => {
         for (let other of successParticipants) {
           if (

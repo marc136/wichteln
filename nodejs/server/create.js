@@ -46,7 +46,7 @@ async function createEvent (ctx, next) {
   print(db)
 
   // hide the sorting because it equals the chain of gifts
-  shuffleArrayInPlace(result.participants)
+  sortParticipantsInPlace(result.participants)
   ctx.body = result
 }
 
@@ -58,6 +58,19 @@ function shuffleArrayInPlace (array) {
     array[i] = array[j]
     array[j] = temp
   }
+}
+
+function sortParticipantsInPlace(array) {
+  array.sort(compareParticipants)
+}
+
+function compareParticipants(a, b) {
+  a = (a.name || a.email).toLowerCase()
+  b = (b.name || b.email).toLowerCase()
+  
+  if (a < b) return -1
+  else if (a > b) return 1
+  else return 0
 }
 
 function sendError (ctx, code) {
