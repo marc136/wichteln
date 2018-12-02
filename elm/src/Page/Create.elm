@@ -1,4 +1,4 @@
-module Page.Create exposing (Msg, allEmailsFilledIfNeeded, init, noGdprConfirmation, tooFewParticipants, update, view)
+module Page.Create exposing (allEmailsFilledIfNeeded, init, noGdprConfirmation, tooFewParticipants, update, view)
 
 import Browser.Dom as Dom
 import Date exposing (Date)
@@ -11,6 +11,7 @@ import Json.Decode as D exposing (Value)
 import Json.Encode as E
 import Page.Create.Constants as Constants
 import Page.Create.Encoder as Encoder
+import Page.Create.Message exposing (Msg(..))
 import Page.Create.Model as Model exposing (Filter(..), Kind(..), Model, Participant, SettingsError(..))
 import Page.Create.Sanitize as Sanitize
 import Page.Create.Stage as Stage exposing (Stage)
@@ -24,10 +25,7 @@ import Task
 init : ( Model, Cmd Msg )
 init =
     ( Model.default, Task.perform Today Date.today )
-
-
-
--- |> Tuple.mapFirst (\_ -> test1)
+        |> Tuple.mapFirst (\_ -> test1)
 
 
 test1 : Model
@@ -38,10 +36,10 @@ test1 =
     , kind = FixedList
     , filterFields = NameAndEmail
     , participants =
-        [ { name = "1", email = "b" }
+        [ { name = "1", email = "b@dev.xz" }
         , { name = "2", email = "" }
         , { name = "3", email = "" }
-        , { name = "4", email = "d" }
+        , { name = "4", email = "d@a.com" }
         ]
     , mayStoreEmail = False
     , deleteAfter = 31
@@ -52,21 +50,6 @@ test1 =
 
 
 ---- UPDATE ----
-
-
-type Msg
-    = NoOp
-    | Today Date
-    | Pick Kind
-    | PickFilter Filter
-    | AddParticipant
-    | ChangeParticipantName Int String
-    | ChangeParticipantEmail Int String
-    | GoTo Stage
-    | ToggleMayStoreEmails
-    | DeleteAfter (Maybe Int)
-    | Submit
-    | SubmitResponse (Result Http.Error Value)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -134,10 +117,10 @@ update msg model =
             )
 
         SubmitResponse (Err err) ->
-            let
-                _ =
-                    Debug.log "SubmitResponse Err" err
-            in
+            -- let
+            --     _ =
+            --         Debug.log "SubmitResponse Err" err
+            -- in
             ( model, Cmd.none )
 
         SubmitResponse result ->
@@ -280,7 +263,7 @@ view model =
                 Err response ->
                     div []
                         [ h2 [] [ text "Last response: Error " ]
-                        , pre [] [ code [] [ text (Debug.toString response) ] ]
+                        -- , pre [] [ code [] [ text (Debug.toString response) ] ] -- TODO
                         ]
             ]
         ]
@@ -679,17 +662,11 @@ summaryDataProtection model =
 
 
 debug model =
-    let
-        err e =
-            li [] [ text <| Debug.toString e ]
-    in
     div []
         [ h1 []
             [ text "errors: "
             , text <| String.fromInt <| List.length model.settingsErrors
             ]
-        , ol [] <|
-            List.map err model.settingsErrors
         , button [ onClick (GoTo Stage.LastCheck) ] [ text "again" ]
         , pre [] [ code [] [ text <| Dev.jsonToString <| Encoder.encode model ] ]
         ]

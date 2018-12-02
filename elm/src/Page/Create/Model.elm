@@ -1,8 +1,9 @@
 module Page.Create.Model exposing (Filter(..), Kind(..), Model, Participant, SettingsError(..), default, newParticipant)
 
 import Date exposing (Date)
-import Page.Create.Stage exposing (Stage(..))
 import Http
+import Page.Create.Stage exposing (Stage(..))
+
 
 type alias Model =
     { today : Date

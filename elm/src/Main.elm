@@ -4,10 +4,17 @@ import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Navigation
 import Html exposing (Html, div, h1, img, text)
 import Html.Attributes exposing (src)
-import Json.Encode exposing (Value)
+import Json.Decode as Json exposing (Value)
 import Page.Create
+import Page.Create.Message as CreateMessage
 import Page.Create.Model
+import Page.Edit
+import Page.Edit.Message as EditMessage
+import Page.Edit.Model
 import Page.Home
+import Page.Participate
+import Page.Participate.Message as ParticipateMessage
+import Page.Participate.Model
 import Url exposing (Url)
 import Url.Parser as UrlParser
 
@@ -25,11 +32,15 @@ type alias Model =
 type Page
     = Home Page.Home.Model
     | Create Page.Create.Model.Model
+    | Edit Page.Edit.Model.Model
+    | JsonError Json.Error
+    | Participate Page.Participate.Model.Model
 
 
 type Route
     = HomeRoute
     | CreateRoute
+    | ParticipateRoute
 
 
 init : Value -> Url -> Navigation.Key -> ( Model, Cmd Msg )
@@ -58,6 +69,11 @@ initPage route =
                 |> Tuple.mapFirst Create
                 |> Tuple.mapSecond (Cmd.map CreateMsg)
 
+        ParticipateRoute ->
+            Page.Participate.init
+                |> Tuple.mapFirst Participate
+                |> Tuple.mapSecond (Cmd.map ParticipateMsg)
+
 
 
 ---- ROUTING ----
@@ -73,8 +89,10 @@ parseRoute url =
 routeParser : UrlParser.Parser (Route -> a) a
 routeParser =
     UrlParser.oneOf
-        [ UrlParser.map HomeRoute UrlParser.top
+        [ UrlParser.map ParticipateRoute UrlParser.top
+        -- [ UrlParser.map HomeRoute UrlParser.top
         , UrlParser.map CreateRoute (UrlParser.s "neu")
+        , UrlParser.map ParticipateRoute (UrlParser.s "aktion")
         ]
 
 
@@ -87,7 +105,9 @@ type Msg
     | ClickedLink UrlRequest
     | UrlChanged Url
     | HomeMsg Page.Home.Msg
-    | CreateMsg Page.Create.Msg
+    | CreateMsg CreateMessage.Msg
+    | EditMsg EditMessage.Msg
+    | ParticipateMsg ParticipateMessage.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -115,16 +135,25 @@ update msg model =
                 |> Tuple.mapFirst (\change -> { model | page = Home change })
                 |> Tuple.mapSecond (Cmd.map HomeMsg)
 
+        ( CreateMsg (CreateMessage.SubmitResponse (Ok value)), _ ) ->
+            case Page.Edit.init value of
+                Ok data ->
+                    ( { model | page = Edit data }, Cmd.none )
+
+                Err err ->
+                    ( { model | page = JsonError err }, Cmd.none )
+
         ( CreateMsg msg_, Create data ) ->
             Page.Create.update msg_ data
                 |> Tuple.mapFirst (\change -> { model | page = Create change })
                 |> Tuple.mapSecond (Cmd.map CreateMsg)
 
+        ( ParticipateMsg msg_, Participate data ) ->
+            Page.Participate.update msg_ data
+                |> Tuple.mapFirst (\change -> { model | page = Participate change })
+                |> Tuple.mapSecond (Cmd.map ParticipateMsg)
+
         _ ->
-            let
-                _ =
-                    Debug.log "unknown" ( msg, model.page )
-            in
             ( model, Cmd.none )
 
 
@@ -144,6 +173,17 @@ view model =
             Create data ->
                 Page.Create.view data
                     |> Html.map CreateMsg
+
+            Edit data ->
+                Page.Edit.view data
+                    |> Html.map EditMsg
+
+            Participate data ->
+                Page.Participate.view data
+                    |> Html.map ParticipateMsg
+
+            JsonError error ->
+                Html.pre [] [ Html.text (Json.errorToString error) ]
         ]
     }
 
