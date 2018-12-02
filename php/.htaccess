@@ -1,0 +1,5 @@
+RewriteEngine On
+RewriteRule pass\.json$ - [F,L,NC]
+RewriteRule data\.json$ - [F,L,NC]
+
+FallbackResource /wichteln_2018/index.html

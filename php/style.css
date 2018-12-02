@@ -1,0 +1,39 @@
+
+.green {
+  color: rgb(0, 102, 89) !important;
+}
+
+.btn-primary {
+  cursor: pointer;
+  border-color: rgb(0, 102, 89) !important;
+  background-color: rgb(0, 141, 54) !important;
+}
+
+.btn-primary:active,
+.btn-primary:focus,
+.btn-primary:hover {
+  background-color: rgb(0, 102, 89) !important;
+  border-color: rgb(0, 141, 54) !important;
+}
+
+body {
+  background: url(wichtel_hintergrund.png);
+  overflow-y: hidden;
+}
+
+.fullsize {
+  height: 100vh;
+}
+
+form.col {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: .5em;
+  padding: 2em 4em;
+}
+
+@media only screen and (max-device-width: 700px) {
+  form.col {
+    /* background-color: white; */
+    border-radius: 0;
+  }
+}
